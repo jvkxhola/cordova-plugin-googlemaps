@@ -1,3 +1,4 @@
+cordova.define("cordova-plugin-googlemaps.Map", function(require, exports, module) {
 
 
 var utils = require('cordova/utils'),
@@ -39,6 +40,8 @@ var Map = function(__pgmId, _exec) {
   self.MARKERS = {};
   self.OVERLAYS = {};
 
+  self.SEMAPHORE = 0;
+
   var infoWindowLayer = document.createElement('div');
   infoWindowLayer.style.position = 'absolute';
   infoWindowLayer.style.left = 0;
@@ -75,12 +78,6 @@ utils.extend(Map, Overlay);
  * @desc Recalculate the position of HTML elements
  */
 Map.prototype.refreshLayout = function() {
-  // Webkit redraw mandatory
-  // http://stackoverflow.com/a/3485654/697856
-  document.body.style.display = 'inline-block';
-  document.body.offsetHeight;
-  document.body.style.display = '';
-
   this.exec.call(this, null, null, this.__pgmId, 'resizeMap', []);
 };
 
@@ -337,49 +334,61 @@ Map.prototype.clear = function(callback) {
   if (self._isRemoved) {
     // Simply ignore because this map is already removed.
     return Promise.resolve();
-  }
-
-  // Close the active infoWindow
-  var active_marker = self.get('active_marker');
-  if (active_marker) {
-    active_marker.trigger(event.INFO_CLOSE);
-  }
-
-  var clearObj = function(obj) {
-    var ids = Object.keys(obj);
-    var id, instance;
-    for (var i = 0; i < ids.length; i++) {
-      id = ids[i];
-      instance = obj[id];
-      if (instance) {
-        if (typeof instance.remove === 'function') {
-          instance.remove();
-        }
-        instance.off();
-        delete obj[id];
+  }else
+{
+  if(self.SEMAPHORE !== 0)
+  { 
+    if (self.prototype !== undefined)
+      {
+        window.setTimeout(self.prototype.clear(callback), 50);
       }
-    }
-    obj = {};
-  };
-
-  clearObj(self.OVERLAYS);
-  clearObj(self.MARKERS);
-  self.trigger('map_clear');
-
-  var resolver = function(resolve, reject) {
-    self.exec.call(self,
-      resolve.bind(self),
-      reject.bind(self),
-      self.__pgmId, 'clear', [], {
-        sync: true
-      });
-  };
-
-  if (typeof callback === 'function') {
-    resolver(callback, self.errorHandler);
-  } else {
-    return new Promise(resolver);
   }
+  else
+  {
+    // Close the active infoWindow
+    var active_marker = self.get('active_marker');
+    if (active_marker) {
+      active_marker.trigger(event.INFO_CLOSE);
+    }
+
+    var clearObj = function(obj) {
+      var ids = Object.keys(obj);
+      var id, instance;
+      for (var i = 0; i < ids.length; i++) {
+        id = ids[i];
+        instance = obj[id];
+        if (instance) {
+          if (typeof instance.remove === 'function') {
+            instance.remove();
+          }
+          instance.off();
+          delete obj[id];
+        }
+      }
+      obj = {};
+    };
+
+    clearObj(self.OVERLAYS);
+    clearObj(self.MARKERS);
+    self.trigger('map_clear');
+
+    var resolver = function(resolve, reject) {
+      self.exec.call(self,
+        resolve.bind(self),
+        reject.bind(self),
+        self.__pgmId, 'clear', [], {
+          sync: true
+        });
+    };
+
+    if (typeof callback === 'function') {
+      resolver(callback, self.errorHandler);
+    } else {
+      return new Promise(resolver);
+    }
+  }}
+
+
 
 };
 
@@ -480,12 +489,6 @@ Map.prototype.animateCamera = function(cameraPosition, callback) {
     } else {
       return Promise.reject(error);
     }
-  }
-  if ('heading' in cameraPosition) {
-    cameraPosition.heading = cameraPosition.heading % 360;
-  }
-  if ('tilt' in cameraPosition) {
-    cameraPosition.tilt = Math.min(Math.max(0, cameraPosition.tilt), 90);
   }
   // if (!('padding' in cameraPosition)) {
   //   cameraPosition.padding = 10;
@@ -674,17 +677,6 @@ Map.prototype.getCameraPosition = function() {
 };
 
 /**
- * Cancel the camera animation
- * @return {CameraPosition}
- */
-Map.prototype.stopAnimation = function() {
-  var self = this;
-  if (self._isReady) {
-    cordova_exec(null, null, self.__pgmId, 'stopAnimation', []);
-  }
-};
-
-/**
  * Remove the map completely.
  */
 Map.prototype.remove = function(callback) {
@@ -696,7 +688,6 @@ Map.prototype.remove = function(callback) {
     value: true,
     writable: false
   });
-  self.stopAnimation();
 
   self.trigger('remove');
   // var div = self.get('div');
@@ -831,10 +822,9 @@ Map.prototype.setDiv = function(div) {
 
     // Webkit redraw mandatory
     // http://stackoverflow.com/a/3485654/697856
-    // div.style.display = 'none';
-    // div.offsetHeight;
-    // div.style.display = '';
-    document.body.style.transform = 'rotateZ(0deg)';
+    div.style.display = 'none';
+    div.offsetHeight;
+    div.style.display = '';
 
     self.set('div', div);
 
@@ -1158,21 +1148,12 @@ Map.prototype.addTileOverlay = function(tilelayerOptions, callback) {
     if (url instanceof Promise) {
       common.promiseTimeout(5000, url)
         .then(function(finalUrl) {
-
-          var link = document.createElement('a');
-          link.href = finalUrl;
-          finalUrl = link.protocol+'//'+link.host+link.pathname + link.search;
-
           cordova_exec(null, self.errorHandler, self.__pgmId + '-tileoverlay', 'onGetTileUrlFromJS', [hashCode, params.key, finalUrl]);
         })
         .catch(function() {
           cordova_exec(null, self.errorHandler, self.__pgmId + '-tileoverlay', 'onGetTileUrlFromJS', [hashCode, params.key, '(null)']);
         });
     } else {
-
-      var link = document.createElement('a');
-      link.href = url;
-      url = link.protocol+'//'+link.host+link.pathname + link.search;
       cordova_exec(null, self.errorHandler, self.__pgmId + '-tileoverlay', 'onGetTileUrlFromJS', [hashCode, params.key, url]);
     }
   };
@@ -1335,25 +1316,10 @@ Map.prototype.addMarker = function(markerOptions, callback) {
   // Generate a makrer instance at once.
   //------------------------------------
   markerOptions.icon = markerOptions.icon || {};
-  var link;
-  if (typeof markerOptions.icon === 'string') {
-    if (markerOptions.icon.indexOf('://') === -1 &&
-        markerOptions.icon.indexOf('.') === 0) {
-
-      link = document.createElement('a');
-      link.href = markerOptions.icon;
-      markerOptions.icon = link.protocol+'//'+link.host+link.pathname + link.search;
-      link = undefined;
-    }
-  } else if (typeof markerOptions.icon === 'object' && typeof markerOptions.icon.url === 'string') {
-    if (markerOptions.icon.url.indexOf('://') === -1 &&
-        markerOptions.icon.url.indexOf('.') === 0) {
-
-      link = document.createElement('a');
-      link.href = markerOptions.icon.url;
-      markerOptions.icon.url = link.protocol+'//'+link.host+link.pathname + link.search;
-      link = undefined;
-    }
+  if (typeof markerOptions.icon === 'string' || Array.isArray(markerOptions.icon)) {
+    markerOptions.icon = {
+      url: markerOptions.icon
+    };
   }
 
   var marker = new Marker(self, markerOptions, exec);
@@ -1367,11 +1333,6 @@ Map.prototype.addMarker = function(markerOptions, callback) {
     marker.destroy();
     marker = undefined;
   });
-
-  if (typeof markerOptions.anchor === 'object' &&
-      'x' in markerOptions.anchor && 'y' in markerOptions.anchor) {
-    markerOptions.anchor = [markerOptions.anchor.x, markerOptions.anchor.y];
-  }
 
   self.exec.call(self, function(result) {
 
@@ -1388,8 +1349,11 @@ Map.prototype.addMarker = function(markerOptions, callback) {
 
     if (typeof callback === 'function') {
       callback.call(self, marker);
+      self.SEMAPHORE--;
     }
   }, self.errorHandler, self.__pgmId, 'loadPlugin', ['Marker', markerOptions, marker.hashCode]);
+
+  self.SEMAPHORE++;
 
   return marker;
 };
@@ -1584,3 +1548,5 @@ Map.prototype._onCameraEvent = function(eventName, cameraPosition) {
 };
 
 module.exports = Map;
+
+});
