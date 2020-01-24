@@ -196,8 +196,8 @@ public class AsyncLoadImage extends AsyncTask<Void, Void, AsyncLoadImage.AsyncLo
     //--------------------------------
     if (!iconUrl.startsWith("data:image")) {
 
-      if (iconUrl.startsWith("http://localhost") ||
-          iconUrl.startsWith("http://127.0.0.1")) {
+      if (currentPageUrl.startsWith("http://localhost") ||
+          currentPageUrl.startsWith("http://127.0.0.1")) {
 //        Log.d(TAG, String.format("---->(201)iconURL = %s", iconUrl));
         if (iconUrl.contains("://")) {
           iconUrl = iconUrl.replaceAll("http://.+?/", "file:///android_asset/www/");
