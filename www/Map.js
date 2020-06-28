@@ -1,5 +1,3 @@
-cordova.define("cordova-plugin-googlemaps.Map", function(require, exports, module) {
-
 
 var utils = require('cordova/utils'),
   cordova_exec = require('cordova/exec'),
@@ -1548,5 +1546,3 @@ Map.prototype._onCameraEvent = function(eventName, cameraPosition) {
 };
 
 module.exports = Map;
-
-});
